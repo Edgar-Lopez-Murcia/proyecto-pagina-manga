@@ -43,7 +43,7 @@ export default function Navbar() {
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setIsDropdownOpen(false)} />
                 <div className="absolute top-full left-0 mt-3 w-52 bg-[#0F172A] border border-gray-800 rounded-xl shadow-2xl py-2 z-20">
-                  <a href="#" className="flex items-center gap-2 px-4 py-2.5 text-gray-300 hover:bg-gray-800/50 hover:text-white transition-colors">
+                  <a href="/manhwas" className="flex items-center gap-2 px-4 py-2.5 text-gray-300 hover:bg-gray-800/50 hover:text-white transition-colors">
                     <BookOpen size={16} className="text-gray-400" /> Manhwas
                   </a>
                   <a href="#" className="flex items-center gap-2 px-4 py-2.5 text-gray-300 hover:bg-gray-800/50 hover:text-white transition-colors">

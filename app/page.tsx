@@ -3,6 +3,7 @@ import React from 'react';
 import Navbar from '@/components/Navbar';
 import HeroSlider from '@/components/HeroSlider';
 import MangaCard from '@/components/MangaCard';
+import Footer from '@/components/Footer';
 import { Manga } from '@/types';
 import { Info } from 'lucide-react';
 
@@ -98,6 +99,8 @@ export default function Home() {
           </div>
         </section>
       </div>
+          {/* 5. Pie de Página Global */}
+         <Footer />
     </main>
   );
 }

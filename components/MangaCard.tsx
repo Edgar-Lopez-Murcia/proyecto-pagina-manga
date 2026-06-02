@@ -1,5 +1,6 @@
 // src/components/MangaCard.tsx
 import React from 'react';
+import Link from 'next/link'; // <-- Importamos el enrutador rápido de Next.js
 import { Manga } from '@/types';
 
 interface MangaCardProps {
@@ -7,8 +8,17 @@ interface MangaCardProps {
 }
 
 export default function MangaCard({ manga }: MangaCardProps) {
+  // Convertimos el título a un formato amigable para la URL (Ej: "Solo Leveling" -> "solo-leveling")
+  const slugManga = manga.title.toLowerCase().replace(/:/g, '').replace(/\s+/g, '-');
+  // Convertimos el capítulo a formato de URL (Ej: "Cap. 29" -> "capitulo-29")
+  const slugCapitulo = manga.latestChapter.toLowerCase().replace(/\./g, '').replace(/\s+/g, '-');
+
   return (
-    <div className="group flex flex-col gap-3 cursor-pointer">
+    // Reemplazamos el div contenedor por un Link que apunta a la ruta dinámica
+    <Link 
+      href={`/manhwas/${slugManga}`} 
+      className="group flex flex-col gap-3 cursor-pointer select-none"
+      >
       {/* Contenedor de la Imagen de Portada */}
       <div className="relative aspect-[3/4] rounded-xl overflow-hidden border border-gray-800 bg-gray-950 shadow-md">
         <img 
@@ -33,10 +43,10 @@ export default function MangaCard({ manga }: MangaCardProps) {
           {manga.title}
         </h4>
         <div className="flex items-center justify-between text-xs text-gray-500 font-semibold">
-          <span>{manga.latestChapter}</span>
+          <span className="text-red-400 group-hover:text-red-300 transition-colors">{manga.latestChapter}</span>
           <span>{manga.updatedAt}</span>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
