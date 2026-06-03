@@ -10,7 +10,7 @@ export default function LectorPage() {
   const router = useRouter();
   const idManga = params?.id as string;
   const idCapitulo = params?.capitulo as string;
-
+  
   const nombreFormateado = idManga?.replace(/-/g, ' ').toUpperCase();
   const capituloFormateado = idCapitulo?.replace(/-/g, ' ').toUpperCase();
 
