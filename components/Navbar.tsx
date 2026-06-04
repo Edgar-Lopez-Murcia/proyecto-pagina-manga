@@ -3,162 +3,285 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { Search, Heart, User, ChevronDown } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { BASE_DATOS_MANGAS } from '@/data/mangas';
+import { Search, Heart, Menu, X } from 'lucide-react';
+
+// 🧮 Función auxiliar: Calcula la distancia de Levenshtein entre dos palabras
+function obtenerDistanciaLevenshtein(a: string, b: string): number {
+  const matriz: number[][] = [];
+
+  for (let i = 0; i <= b.length; i++) {
+    matriz[i] = [i];
+  }
+  for (let j = 0; j <= a.length; j++) {
+    matriz[0][j] = j;
+  }
+
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matriz[i][j] = matriz[i - 1][j - 1];
+      } else {
+        matriz[i][j] = Math.min(
+          matriz[i - 1][j - 1] + 1, // Sustitución
+          matriz[i][j - 1] + 1,     // Inserción
+          matriz[i - 1][j] + 1      // Eliminación
+        );
+      }
+    }
+  }
+  return matriz[b.length][a.length];
+}
+
+// 🕵️‍♂️ Función de Búsqueda Difusa (Fuzzy Search)
+function buscarConTolerancia(terminoBuscado: string, listaMangas: any[]): any[] {
+  const termino = terminoBuscado.toLowerCase().trim();
+  if (!termino) return [];
+
+  // Dividimos la búsqueda del usuario en palabras individuales
+  const palabrasBusqueda = termino.split(/\s+/);
+
+  const puntuados = listaMangas.map((manga) => {
+    const titulo = (manga.titulo || manga.title || '').toLowerCase();
+    const palabrasTitulo = titulo.split(/\s+/);
+    
+    // 1. Prioridad Máxima: Si contiene la frase exacta o empieza igual
+    if (titulo.includes(termino)) {
+      return { manga, coincidencia: true, score: 0 };
+    }
+
+    // 2. Comprobación por aproximación de Levenshtein palabra por palabra
+    let scoreTotal = 0;
+    let palabrasEncontradas = 0;
+
+    for (const pBusqueda of palabrasBusqueda) {
+      if (pBusqueda.length < 2) continue; // Ignorar letras sueltas
+
+      let mejorDistanciaPalabra = 999;
+
+      for (const pTitulo of palabrasTitulo) {
+        // Ignorar artículos cortos en el título para mejorar la precisión
+        if (pTitulo.length < 2) continue; 
+
+        const distancia = obtenerDistanciaLevenshtein(pBusqueda, pTitulo);
+        if (distancia < mejorDistanciaPalabra) {
+          mejorDistanciaPalabra = distancia;
+        }
+      }
+
+      // Definimos el umbral de tolerancia según el largo de la palabra escritas por el usuario
+      const limiteTolerancia = pBusqueda.length <= 4 ? 1 : 2; 
+
+      if (mejorDistanciaPalabra <= limiteTolerancia) {
+        scoreTotal += mejorDistanciaPalabra;
+        palabrasEncontradas++;
+      }
+    }
+
+    // Si la mayoría de las palabras coinciden por aproximación, es válido
+    const esValido = palabrasEncontradas >= Math.ceil(palabrasBusqueda.length * 0.6);
+
+    return { 
+      manga, 
+      coincidencia: esValido, 
+      score: scoreTotal + (palabrasBusqueda.length - palabrasEncontradas) * 3 
+    };
+  });
+
+  // Filtramos los que pasaron el filtro y los ordenamos (menor score = mejor coincidencia)
+  return puntuados
+    .filter(item => item.coincidencia)
+    .sort((a, b) => a.score - b.score)
+    .map(item => item.manga);
+}
 
 export default function Navbar() {
-  // Estado para la cantidad de favoritos en tiempo real
-  const [cantidadFavoritos, setCantidadFavoritos] = useState<number>(0);
+  const router = useRouter();
   
-  // Estado para controlar si el menú desplegable de "Series" está abierto
-  const [menuSeriesAbierto, setMenuSeriesAbierto] = useState<boolean>(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const [busqueda, setBusqueda] = useState<string>('');
+  const [resultados, setResultados] = useState<any[]>([]);
+  const [mostrarDropdown, setMostrarDropdown] = useState<boolean>(false);
+  const [contadorFavoritos, setContadorFavoritos] = useState<number>(0);
+  const [menuMovilAbierto, setMenuMovilAbierto] = useState<boolean>(false);
+  
+  const contenedorBusquedaRef = useRef<HTMLDivElement>(null);
 
-  // Escuchamos el localStorage para actualizar el globo numérico dinámicamente
   useEffect(() => {
-    const actualizarContador = () => {
-      const favoritosGuardados = localStorage.getItem('sumi-favoritos');
-      if (favoritosGuardados) {
-        const lista = JSON.parse(favoritosGuardados);
-        setCantidadFavoritos(lista.length);
-      } else {
-        setCantidadFavoritos(0);
+    function manejarClickAfuera(evento: MouseEvent) {
+      if (contenedorBusquedaRef.current && !contenedorBusquedaRef.current.contains(evento.target as Node)) {
+        setMostrarDropdown(false);
       }
-    };
-
-    actualizarContador();
-
-    window.addEventListener('storage', actualizarContador);
-    window.addEventListener('favoritosActualizados', actualizarContador);
-
-    return () => {
-      window.removeEventListener('storage', actualizarContador);
-      window.removeEventListener('favoritosActualizados', actualizarContador);
-    };
+    }
+    document.addEventListener('mousedown', manejarClickAfuera);
+    return () => document.removeEventListener('mousedown', manejarClickAfuera);
   }, []);
 
-  // Cerrar el menú desplegable si el usuario da clic afuera de él
+  const actualizarContadorFavoritos = () => {
+    const favoritos = localStorage.getItem('sumi-favoritos');
+    if (favoritos) {
+      const listaIds = JSON.parse(favoritos);
+      setContadorFavoritos(listaIds.length);
+    } else {
+      setContadorFavoritos(0);
+    }
+  };
+
   useEffect(() => {
-    const clickAfuera = (evento: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(evento.target as Node)) {
-        setMenuSeriesAbierto(false);
-      }
-    };
-    document.addEventListener('mousedown', clickAfuera);
-    return () => document.removeEventListener('mousedown', clickAfuera);
+    actualizarContadorFavoritos();
+    window.addEventListener('favoritosActualizados', actualizarContadorFavoritos);
+    return () => window.removeEventListener('favoritosActualizados', actualizarContadorFavoritos);
   }, []);
+
+  // Manejar el cambio en el input aplicando la búsqueda difusa inteligente
+  const manejarBusqueda = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const valor = e.target.value;
+    setBusqueda(valor);
+
+    if (valor.trim().length > 0) {
+      const filtrados = buscarConTolerancia(valor, BASE_DATOS_MANGAS);
+      setResultados(filtrados);
+      setMostrarDropdown(true);
+    } else {
+      setResultados([]);
+      setMostrarDropdown(false);
+    }
+  };
+
+  const manejarSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (resultados.length > 0) {
+      setMostrarDropdown(false);
+      setBusqueda('');
+      router.push(`/manhwas/${resultados[0].id}`);
+    }
+  };
 
   return (
-    <nav className="fixed top-0 left-0 w-full h-20 bg-[#0B0F19]/80 backdrop-blur-md border-b border-gray-900/50 px-6 flex items-center justify-between z-50">
-      
-      {/* IZQUIERDA: LOGO Y MENÚS */}
-      <div className="flex items-center gap-10">
-        <Link href="/" className="text-2xl font-black text-white tracking-widest flex items-center gap-1 select-none">
-          SUMI<span className="text-red-500">.</span>
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0B0F19]/80 backdrop-blur-md border-b border-gray-900/80">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between gap-4">
+        
+        {/* LOGO */}
+        <Link href="/" className="text-xl font-black text-white tracking-widest flex items-center gap-2 shrink-0">
+          <span className="text-red-500">S</span>UMI
         </Link>
 
-        <div className="hidden md:flex items-center gap-6 text-sm font-bold text-gray-400 relative">
-          <Link href="/" className="hover:text-white transition-colors">
-            Inicio
-          </Link>
-          
-          {/* CONTENEDOR DEL MENÚ DESPLEGABLE DE SERIES */}
-          <div className="relative" ref={menuRef}>
-            <button 
-              onClick={() => setMenuSeriesAbierto(!menuSeriesAbierto)}
-              className="hover:text-white transition-colors flex items-center gap-1 cursor-pointer font-bold focus:outline-none"
-            >
-              Series <ChevronDown size={14} className={`transition-transform duration-200 ${menuSeriesAbierto ? 'rotate-180 text-red-500' : ''}`} />
-            </button>
+        {/* 🔍 BARRA DE BÚSQUEDA INTERACTIVA CON INTELIGENCIA ANTI-TYPOS */}
+        <div ref={contenedorBusquedaRef} className="hidden sm:block flex-1 max-w-md relative">
+          <form onSubmit={manejarSubmit} className="relative w-full h-10 bg-[#0F1422]/60 border border-gray-900 rounded-xl focus-within:border-gray-800 transition-all flex items-center px-3">
+            <Search size={16} className="text-gray-500 shrink-0" />
+            <input
+              type="text"
+              value={busqueda}
+              onChange={manejarBusqueda}
+              onFocus={() => busqueda.trim().length > 0 && setMostrarDropdown(true)}
+              placeholder="Buscar manhwa (tolera errores)..."
+              className="w-full h-full bg-transparent outline-none border-none text-xs text-gray-200 placeholder-gray-600 px-2.5 font-medium"
+            />
+          </form>
 
-            {/* MENÚ FLOTANTE CON ICONOS SVG */}
-            {menuSeriesAbierto && (
-              <div className="absolute left-0 mt-3 w-52 bg-[#0F1422] border border-gray-900 rounded-xl shadow-2xl p-2 flex flex-col gap-1 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                
-                <Link 
-                  href="/manhwas" 
-                  onClick={() => setMenuSeriesAbierto(false)}
-                  className="px-3 py-2.5 hover:bg-gray-800/50 rounded-lg text-xs font-black uppercase tracking-wider text-gray-300 hover:text-white transition-all flex items-center gap-2.5"
-                >
-                  <svg className="w-4 h-4 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="m12 3-1.912 5.886H3.873l5.017 3.644L6.978 18.4 12 14.756l5.022 3.644-1.912-5.87 5.017-3.644h-6.215z"/>
-                  </svg>
-                  Ver Todo el Catálogo
-                </Link>
-
-                <div className="h-[1px] bg-gray-900 my-1" />
-
-                <Link 
-                  href="/manhwas?genero=accion" 
-                  onClick={() => setMenuSeriesAbierto(false)}
-                  className="px-3 py-2 hover:bg-gray-800/30 rounded-lg text-xs text-gray-400 hover:text-gray-200 transition-all flex items-center gap-2.5 font-bold"
-                >
-                  <svg className="w-4 h-4 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14.5 17.5 3 6V3h3l11.5 11.5"/>
-                    <path d="m13 19 6-6"/>
-                    <path d="M19 19h.01"/>
-                    <path d="M19 13h.01"/>
-                    <path d="M14 19h.01"/>
-                  </svg>
-                  Acción
-                </Link>
-
-                <Link 
-                  href="/manhwas?genero=isekai" 
-                  onClick={() => setMenuSeriesAbierto(false)}
-                  className="px-3 py-2 hover:bg-gray-800/30 rounded-lg text-xs text-gray-400 hover:text-gray-200 transition-all flex items-center gap-2.5 font-bold"
-                >
-                  <svg className="w-4 h-4 text-purple-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 2a10 10 0 1 0 10 10H12z"/>
-                    <path d="M12 12A10 10 0 1 0 2 12h10z"/>
-                    <path d="M12 12a10 10 0 1 0 10-10V12z"/>
-                  </svg>
-                  Isekai / Sistema
-                </Link>
-
-                <Link 
-                  href="/manhwas?genero=romance" 
-                  onClick={() => setMenuSeriesAbierto(false)}
-                  className="px-3 py-2 hover:bg-gray-800/30 rounded-lg text-xs text-gray-400 hover:text-gray-200 transition-all flex items-center gap-2.5 font-bold"
-                >
-                  <svg className="w-4 h-4 text-pink-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
-                  </svg>
-                  Romance
-                </Link>
-
-              </div>
-            )}
-          </div>
+          {/* DROPDOWN DE RESULTADOS */}
+          {mostrarDropdown && (
+            <div className="absolute top-12 left-0 right-0 bg-[#0F1422] border border-gray-900 rounded-xl overflow-hidden shadow-2xl z-50 flex flex-col max-h-64 overflow-y-auto divide-y divide-gray-900/40">
+              {resultados.length > 0 ? (
+                resultados.map((manga: any) => (
+                  <Link
+                    key={manga.id}
+                    href={`/manhwas/${manga.id}`}
+                    onClick={() => {
+                      setMostrarDropdown(false);
+                      setBusqueda('');
+                    }}
+                    className="flex items-center gap-3 p-3 hover:bg-[#161D30]/50 transition-colors group"
+                  >
+                    <img
+                      src={manga.imagen || manga.coverUrl || manga.imagenUrl || ''}
+                      alt={manga.titulo || manga.title}
+                      className="w-8 h-11 object-cover rounded-md bg-[#0B0F19]"
+                    />
+                    <div className="overflow-hidden">
+                      <p className="text-xs font-bold text-gray-300 group-hover:text-white truncate">
+                        {manga.titulo || manga.title}
+                      </p>
+                      <p className="text-[10px] text-gray-500 font-medium truncate mt-0.5">
+                        {manga.autor || manga.author || 'Manga'}
+                      </p>
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <div className="p-4 text-center text-[11px] text-gray-500 font-medium">
+                  No se encontraron resultados para "{busqueda}"
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      </div>
 
-      {/* DERECHA: ICONOS DE ACCIÓN */}
-      <div className="flex items-center gap-4 text-gray-400">
-        <button className="p-2 hover:text-white transition-colors cursor-pointer" title="Buscar">
-          <Search size={20} />
-        </button>
-
-        {/* CORAZÓN DE BIBLIOTECA DINÁMICO */}
-        <Link 
-          href="/biblioteca" 
-          className="p-2 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5 relative"
-          title="Mi Biblioteca"
-        >
-          <Heart 
-            size={20} 
-            className={`transition-colors ${cantidadFavoritos > 0 ? "text-red-500 fill-red-500" : ""}`} 
-          />
+        {/* NAVEGACIÓN DERECHA */}
+        <div className="hidden sm:flex items-center gap-6 text-xs font-black uppercase tracking-wider">
+          <Link href="/" className="text-gray-400 hover:text-white transition-colors">Inicio</Link>
+          <Link href="/series" className="text-gray-400 hover:text-white transition-colors">Series</Link>
           
-          <span className="text-[11px] font-black bg-blue-600 text-white min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center border border-[#0B0F19]">
-            {cantidadFavoritos}
-          </span>
-        </Link>
+          <Link href="/favoritos" className="relative p-2 text-gray-400 hover:text-red-400 transition-colors flex items-center justify-center">
+            <Heart size={18} />
+            {contadorFavoritos > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white font-black text-[9px] w-4 h-4 rounded-full flex items-center justify-center animate-pulse">
+                {contadorFavoritos}
+              </span>
+            )}
+          </Link>
+        </div>
 
-        <button className="p-2 hover:text-white transition-colors cursor-pointer" title="Mi Perfil">
-          <User size={20} />
+        {/* BOTÓN MÓVIL */}
+        <button 
+          onClick={() => setMenuMovilAbierto(!menuMovilAbierto)}
+          className="sm:hidden p-2 text-gray-400 hover:text-white transition-colors cursor-pointer"
+        >
+          {menuMovilAbierto ? <X size={20} /> : <Menu size={20} />}
         </button>
+
       </div>
 
+      {/* MENÚ DESPLEGABLE MÓVIL */}
+      {menuMovilAbierto && (
+        <div className="sm:hidden bg-[#0B0F19] border-b border-gray-900/80 px-4 pt-2 pb-6 flex flex-col gap-4 text-xs font-black uppercase tracking-wider">
+          <div className="relative w-full h-10 bg-[#0F1422]/60 border border-gray-900 rounded-xl flex items-center px-3">
+            <Search size={16} className="text-gray-500 shrink-0" />
+            <input
+              type="text"
+              value={busqueda}
+              onChange={manejarBusqueda}
+              placeholder="Buscar manhwa..."
+              className="w-full h-full bg-transparent outline-none border-none text-xs text-gray-200 placeholder-gray-600 px-2.5 font-medium"
+            />
+          </div>
+          
+          {busqueda.trim().length > 0 && (
+            <div className="bg-[#0F1422] border border-gray-900 rounded-xl overflow-hidden max-h-40 overflow-y-auto divide-y divide-gray-900/40">
+              {resultados.map((manga: any) => (
+                <Link
+                  key={manga.id}
+                  href={`/manhwas/${manga.id}`}
+                  onClick={() => {
+                    setMenuMovilAbierto(false);
+                    setBusqueda('');
+                  }}
+                  className="flex items-center gap-3 p-2.5"
+                >
+                  <p className="text-xs font-bold text-gray-300 truncate">{manga.titulo || manga.title}</p>
+                </Link>
+              ))}
+            </div>
+          )}
+
+          <Link href="/" onClick={() => setMenuMovilAbierto(false)} className="text-gray-400 hover:text-white transition-colors pt-2">Inicio</Link>
+          <Link href="/series" onClick={() => setMenuMovilAbierto(false)} className="text-gray-400 hover:text-white transition-colors">Series</Link>
+          <Link href="/favoritos" onClick={() => setMenuMovilAbierto(false)} className="text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+            Favoritos <span className="text-red-400">({contadorFavoritos})</span>
+          </Link>
+        </div>
+      )}
     </nav>
   );
 }
