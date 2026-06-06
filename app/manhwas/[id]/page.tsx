@@ -1,357 +1,202 @@
 // src/app/manhwas/[id]/page.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import React, { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { BASE_DATOS_MANGAS } from '@/data/mangas';
-import { Star, BookOpen, Heart, Eye, ChevronDown, ChevronUp, Send } from 'lucide-react';
+import { BASE_DATOS_MANGAS, Manga } from '@/data/mangas';
+import { Star, MessageSquare, Play, Bookmark, Eye, Clock, Loader2, ArrowLeft } from 'lucide-react';
 
-interface Comentario {
-  id: string;
-  usuario: string;
-  texto: string;
-  fecha: string;
-}
-
-export default function DetalleManhwaPage() {
+export default function CaratulaPremiumPage() {
   const params = useParams();
-  const idManga = params?.id as string;
+  const mangaId = params?.id as string;
 
-  // Estados esenciales de interfaz
-  const [mostrarTodos, setMostrarTodos] = useState<boolean>(false);
-  const [esFavorito, setEsFavorito] = useState<boolean>(false);
-  
-  // Registra el último capítulo guardado en el historial de lectura
-  const [ultimoCapituloLeido, setUltimoCapituloLeido] = useState<string | null>(null);
-  
-  // Estado para el sistema interactivo de comentarios
-  const [comentarios, setComentarios] = useState<Comentario[]>([
-    { id: '1', usuario: 'SoloReader', texto: '¡Este manhwa es una absoluta obra de arte! El diseño de los paneles mejora en cada capítulo.', fecha: 'Hace 2 horas' },
-    { id: '2', usuario: 'ShadowDev', texto: 'Por fin adaptaron esta novela, el ritmo del inicio está perfecto.', fecha: 'Ayer' }
-  ]);
-  const [nuevoComentario, setNuevoComentario] = useState<string>('');
+  const [manga, setManga] = useState<Manga | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [comentarioUser, setComentarioUser] = useState<string>('');
 
-  // 1. Buscamos el manhwa en la base de datos simulada
-  const mangaRaw = BASE_DATOS_MANGAS.find((m) => m.id === idManga) as any;
-
-  // 2. Mapeo seguro de datos con fallbacks para evitar errores si faltan campos
-  const manga = mangaRaw ? {
-    id: mangaRaw.id,
-    titulo: mangaRaw.titulo || mangaRaw.title || 'Sin título',
-    autor: mangaRaw.autor || mangaRaw.author || 'Desconocido',
-    sinopsis: mangaRaw.sinopsis || mangaRaw.description || mangaRaw.synopsis || 'No hay sinopsis disponible actualmente para esta serie.',
-    imagen: mangaRaw.imagen || mangaRaw.coverUrl || mangaRaw.imagenUrl || '',
-    calificacion: mangaRaw.calificacion || mangaRaw.rating || 4.5,
-    tipo: mangaRaw.tipo || mangaRaw.type || 'Manhwa',
-    capitulos: mangaRaw.capitulos || mangaRaw.chapters || [
-      { id: '1', titulo: 'Prólogo de la serie', fecha: 'Hace 3 días' },
-      { id: '2', titulo: 'El despertar del poder', fecha: 'Hace 2 días' },
-      { id: '3', titulo: 'Primera misión en solitario', fecha: 'Hace 1 día' },
-      { id: '4', titulo: 'El gremio de las sombras', fecha: 'Hace 5 horas' },
-      { id: '5', titulo: 'Invasión a la mazmorra (Último)', fecha: 'Hace 5 min' }
-    ]
-  } : null;
-
-  // 3. Cargar persistencia desde el LocalStorage al montar el componente
   useEffect(() => {
-    if (!idManga) return;
+    if (!mangaId) return;
+    setIsLoading(true);
 
-    // Verificar favoritos
-    const favoritos = localStorage.getItem('sumi-favoritos');
-    if (favoritos) {
-      const listaIds = JSON.parse(favoritos);
-      setEsFavorito(listaIds.includes(idManga));
+    const encontrado = BASE_DATOS_MANGAS.find(
+      (m) => String(m.id).trim().toLowerCase() === String(mangaId).trim().toLowerCase()
+    );
+
+    if (encontrado) {
+      setManga(encontrado);
     }
+    setIsLoading(false);
+  }, [mangaId]);
 
-    // Recuperar el punto exacto de continuación de lectura
-    const historial = localStorage.getItem('sumi_progreso');
-    if (historial) {
-      const progreso = JSON.parse(historial);
-      if (progreso[idManga]) {
-        setUltimoCapituloLeido(progreso[idManga].toString());
-      }
-    }
-  }, [idManga]);
-
-  // 4. Alternar el estado de favoritos
-  const controlarFavorito = () => {
-    const favoritos = localStorage.getItem('sumi-favoritos');
-    let listaIds = favoritos ? JSON.parse(favoritos) : [];
-
-    if (listaIds.includes(idManga)) {
-      listaIds = listaIds.filter((id: string) => id !== idManga);
-      setEsFavorito(false);
-    } else {
-      listaIds.push(idManga);
-      setEsFavorito(true);
-    }
-
-    localStorage.setItem('sumi-favoritos', JSON.stringify(listaIds));
-    window.dispatchEvent(new Event('favoritosActualizados'));
-  };
-
-  // 5. Agregar un nuevo comentario a la lista
-  const enviarComentario = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!nuevoComentario.trim()) return;
-
-    const comentarioCreado: Comentario = {
-      id: Date.now().toString(),
-      usuario: 'ByInalik (Tú)',
-      texto: nuevoComentario.trim(),
-      fecha: 'Ahora mismo'
-    };
-
-    setComentarios([comentarioCreado, ...comentarios]);
-    setNuevoComentario('');
-  };
-
-  if (!manga) {
+  if (isLoading) {
     return (
-      <main className="min-h-screen bg-[#0B0F19] text-gray-200 flex flex-col justify-between">
+      <div className="min-h-screen bg-[#05070B] text-white flex flex-col justify-between">
         <Navbar />
-        <div className="py-32 text-center max-w-md mx-auto">
-          <h2 className="text-sm font-black text-white uppercase tracking-wider">Serie no encontrada</h2>
-          <p className="text-xs text-gray-500 mt-2">El identificador de este manhwa no existe en nuestros registros actuales.</p>
+        <div className="flex flex-col items-center justify-center py-40">
+          <Loader2 size={32} className="animate-spin text-red-600 mb-3" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Cargando serie...</span>
         </div>
         <Footer />
-      </main>
+      </div>
     );
   }
 
-  // Configuración del paginador de capítulos ("Ver Más")
-  const capitulosVisibles = mostrarTodos ? manga.capitulos : manga.capitulos.slice(0, 5);
-
-  // Destino del botón principal de lectura (Historial o Capítulo 1)
-  const primerCapituloId = manga.capitulos[0]?.id?.toString() || '1';
-  const destinoLecturaId = ultimoCapituloLeido || primerCapituloId;
+  if (!manga) {
+    return (
+      <div className="min-h-screen bg-[#05070B] text-white flex flex-col justify-between">
+        <Navbar />
+        <div className="text-center py-40 px-4">
+          <h2 className="text-sm font-black uppercase tracking-widest text-red-500 mb-2">Manhwa no encontrado</h2>
+          <Link href="/" className="inline-block bg-gray-900 border border-gray-800 text-[10px] font-black uppercase tracking-wider px-6 py-3 rounded-xl hover:bg-gray-800 transition-all">
+            Volver al Inicio
+          </Link>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
-    <main className="min-h-screen bg-[#0B0F19] text-gray-200 flex flex-col justify-between selection:bg-red-500/20 selection:text-red-400">
+    <main className="min-h-screen bg-[#020306] text-gray-200 flex flex-col justify-between selection:bg-red-600 selection:text-white">
       <div>
         <Navbar />
 
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-32 pb-16">
-          
-          {/* SECCIÓN SUPERIOR: HERO DETALLES */}
-          <div className="flex flex-col md:flex-row gap-8 items-center md:items-start border-b border-gray-900 pb-12">
-            <div className="w-56 h-80 bg-[#0F1422] rounded-2xl overflow-hidden border border-gray-800 shadow-2xl shrink-0 relative">
-              {manga.imagen && (
-                <img 
-                  src={manga.imagen} 
-                  alt={manga.titulo} 
-                  className="w-full h-full object-cover select-none"
-                />
-              )}
+        <div className="max-w-4xl mx-auto px-4 pt-28 pb-16">
+          {/* Volver */}
+          <Link href="/" className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white mb-6 transition-colors">
+            <ArrowLeft size={12} className="text-red-500" />
+            <span>Volver al inicio</span>
+          </Link>
+
+          {/* CABECERA DE LA CARÁTULA */}
+          <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-8 items-start mb-12">
+            {/* Imagen de Portada */}
+            <div className="w-full max-w-[240px] mx-auto md:mx-0 aspect-[3/4] rounded-2xl overflow-hidden border border-gray-900 shadow-2xl relative">
+              <img src={manga.imagen} alt={manga.titulo} className="w-full h-full object-cover" />
             </div>
 
-            <div className="flex-1 text-center md:text-left">
-              <span className="px-2.5 py-1 bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-black uppercase tracking-widest rounded-md">
-                {manga.tipo}
+            {/* Información Técnica */}
+            <div className="flex flex-col">
+              <span className="text-[9px] font-black uppercase tracking-widest text-red-500 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-md self-center md:self-start mb-2">
+                Manhwa
               </span>
-              
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-white uppercase tracking-wider mt-3 leading-tight">
+              <h1 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tight mb-1 text-center md:text-left">
                 {manga.titulo}
               </h1>
-              
-              <p className="text-xs text-gray-500 font-bold mt-1.5 italic">
-                Por: <span className="text-gray-400 not-italic">{manga.autor}</span>
-              </p>
+              <p className="text-xs text-gray-500 font-medium mb-4 text-center md:text-left">Por: Desconocido</p>
 
-              <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mt-6">
-                <div className="flex items-center gap-1.5 bg-[#0F1422] border border-gray-900/60 px-3 py-1.5 rounded-xl text-xs font-bold text-yellow-500">
-                  <Star size={14} className="fill-yellow-500" />
-                  {manga.calificacion}
+              {/* Badges de Stats (Estrellas, Caps, Favoritos) */}
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mb-6">
+                <div className="flex items-center gap-1.5 bg-[#0F1422] border border-gray-900 px-3 py-1.5 rounded-lg text-xs font-bold text-amber-500">
+                  <Star size={13} fill="currentColor" />
+                  <span>4.9</span>
                 </div>
-                <div className="flex items-center gap-1.5 bg-[#0F1422] border border-gray-900/60 px-3 py-1.5 rounded-xl text-xs font-bold text-gray-400">
-                  <BookOpen size={14} />
-                  {manga.capitulos.length} Capítulos
+                <div className="flex items-center gap-1.5 bg-[#0F1422] border border-gray-900 px-3 py-1.5 rounded-lg text-xs font-bold text-blue-400">
+                  <MessageSquare size={13} />
+                  <span>{manga.capitulos?.length || 0} Capítulos</span>
                 </div>
-                <div className="flex items-center gap-1.5 bg-[#0F1422] border border-gray-900/60 px-3 py-1.5 rounded-xl text-xs font-bold text-gray-400">
-                  <Heart size={14} className="text-red-500 fill-red-500" />
-                  {esFavorito ? '1' : '0'} Favoritos
+                <div className="flex items-center gap-1.5 bg-[#0F1422] border border-gray-900 px-3 py-1.5 rounded-lg text-xs font-bold text-pink-500">
+                  <span>❤️ 0 Favoritos</span>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3 mt-8 max-w-md">
-                {/* BOTÓN PRINCIPAL DINÁMICO */}
-                <Link
-                  href={`/ver/${manga.id}/${destinoLecturaId}`}
-                  className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-red-500/10 text-center flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M5 3l14 9-14 9V3z"/>
-                  </svg>
-                  {ultimoCapituloLeido ? (
-                    <span>Continuar cap. {ultimoCapituloLeido}</span>
-                  ) : (
+              {/* Botones de Acción directos */}
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mb-6">
+                {manga.capitulos && manga.capitulos.length > 0 ? (
+                  <Link href={`/manhwas/${manga.id}/${manga.capitulos[0].id}`} className="bg-red-600 hover:bg-red-500 text-white font-black text-[10px] uppercase tracking-widest px-6 py-3 rounded-xl flex items-center gap-2 transition-all shadow-lg shadow-red-600/10">
+                    <Play size={12} fill="currentColor" />
                     <span>Empezar a leer</span>
-                  )}
-                </Link>
+                  </Link>
+                ) : null}
+                <button className="bg-[#0F1422] border border-gray-800 hover:border-gray-700 text-gray-400 hover:text-white font-black text-[10px] uppercase tracking-widest px-6 py-3 rounded-xl flex items-center gap-2 transition-all">
+                  <Bookmark size={12} />
+                  <span>Guardar</span>
+                </button>
+              </div>
 
-                <button
-                  onClick={controlarFavorito}
-                  className={`flex-1 py-3 font-black text-xs uppercase tracking-widest rounded-xl transition-all border text-center flex items-center justify-center gap-2 cursor-pointer ${
-                    esFavorito
-                      ? 'bg-red-500/10 border-red-500/30 text-red-400 hover:bg-transparent hover:border-gray-800 hover:text-gray-400'
-                      : 'bg-transparent border-gray-800 text-gray-400 hover:border-red-500/50 hover:text-white'
-                  }`}
+              {/* Sinopsis */}
+              <div className="border-t border-gray-900/60 pt-4">
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Sinopsis</h3>
+                <p className="text-xs text-gray-400 leading-relaxed font-medium">
+                  {manga.sinopsis || 'No hay sinopsis disponible actualmente para esta serie.'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* LISTA DE CAPÍTULOS */}
+          <div className="mb-12">
+            <h2 className="text-xs font-black uppercase tracking-widest text-white mb-4 border-b border-gray-900 pb-2">
+              Lista de Capítulos ({manga.capitulos?.length || 0})
+            </h2>
+            <div className="grid grid-cols-1 gap-2">
+              {manga.capitulos?.map((cap) => (
+                <Link
+                  key={cap.id}
+                  href={`/manhwas/${manga.id}/${cap.id}`}
+                  className="flex items-center justify-between p-4 bg-[#0F1422]/40 border border-gray-900/60 rounded-xl hover:bg-[#0F1422]/80 hover:border-gray-800 transition-all group"
                 >
-                  <Heart size={14} className={esFavorito ? "fill-red-400" : ""} />
-                  {esFavorito ? 'Guardado' : 'Guardar'}
+                  <div className="flex items-center gap-3.5">
+                    <div className="p-2 bg-gray-950 border border-gray-800 rounded-lg text-gray-500 group-hover:text-red-500 group-hover:border-red-500/20 transition-colors">
+                      <Eye size={14} />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-gray-200 group-hover:text-white">Capítulo {cap.numero}</h4>
+                      <p className="text-[10px] text-gray-500 font-medium mt-0.5">Prólogo de la serie</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 text-[10px] font-mono text-gray-600">
+                    <Clock size={11} />
+                    <span>Hace 2 días</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* COMENTARIOS */}
+          <div>
+            <h2 className="text-xs font-black uppercase tracking-widest text-white mb-4 border-b border-gray-900 pb-2">
+              Comentarios (2)
+            </h2>
+            <div className="bg-[#05070B]/40 border border-gray-900 rounded-xl p-4 mb-4">
+              <textarea
+                placeholder="Escribe tu opinión sobre este manhwa..."
+                value={comentarioUser}
+                onChange={(e) => setComentarioUser(e.target.value)}
+                className="w-full h-20 bg-gray-950 border border-gray-900 rounded-xl p-3 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-gray-800 resize-none font-medium"
+              />
+              <div className="flex justify-end mt-2">
+                <button className="bg-red-600 hover:bg-red-500 text-white text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-lg transition-colors">
+                  Enviar
                 </button>
               </div>
             </div>
+
+            {/* Listado estático de comentarios como en tu imagen */}
+            <div className="space-y-3">
+              <div className="p-4 bg-[#0F1422]/30 border border-gray-900/60 rounded-xl flex gap-3">
+                <div className="w-8 h-8 rounded-full bg-orange-600 text-white font-black text-[10px] flex items-center justify-center shrink-0">SO</div>
+                <div>
+                  <div className="flex items-center gap-2"><span className="text-xs font-black text-gray-300">SoloReader</span><span className="text-[8px] font-mono text-gray-600">HACE 2 HORAS</span></div>
+                  <p className="text-xs text-gray-400 font-medium mt-1">¡Este manhwa es una absoluta obra de arte! El diseño de los paneles mejora en cada capítulo.</p>
+                </div>
+              </div>
+              <div className="p-4 bg-[#0F1422]/30 border border-gray-900/60 rounded-xl flex gap-3">
+                <div className="w-8 h-8 rounded-full bg-orange-600 text-white font-black text-[10px] flex items-center justify-center shrink-0">SH</div>
+                <div>
+                  <div className="flex items-center gap-2"><span className="text-xs font-black text-gray-300">ShadowDev</span><span className="text-[8px] font-mono text-gray-600">AYER</span></div>
+                  <p className="text-xs text-gray-400 font-medium mt-1">Por fin adaptaron esta novela, el ritmo del inicio está perfecto.</p>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* SECCIÓN CONTENIDO INFERIOR */}
-          <div className="mt-12 grid grid-cols-1 lg:grid-cols-3 gap-10">
-            
-            <div className="lg:col-span-2 flex flex-col gap-12">
-              
-              {/* Sinopsis */}
-              <div>
-                <h2 className="text-xs font-black text-white uppercase tracking-wider mb-4 flex items-center gap-2">
-                  <span className="w-1 h-3.5 bg-red-500 rounded-full" />
-                  Sinopsis
-                </h2>
-                <p className="text-xs sm:text-sm text-gray-400 leading-relaxed font-medium">
-                  {manga.sinopsis}
-                </p>
-              </div>
-
-              {/* LISTA DE CAPÍTULOS CON OJITO ROJO DINÁMICO */}
-              <div>
-                <h2 className="text-xs font-black text-white uppercase tracking-wider mb-6 flex items-center gap-2">
-                  <span className="w-1 h-3.5 bg-red-500 rounded-full" />
-                  Lista de Capítulos ({manga.capitulos.length})
-                </h2>
-
-                <div className="flex flex-col gap-2.5">
-                  {capitulosVisibles.map((cap: any) => {
-                    const idCapituloLimpio = (cap.id || '').toString();
-                    
-                    // Condición: El capítulo es marcado como leído si su número es menor o igual al último guardado
-                    const esLeido = ultimoCapituloLeido 
-                      ? parseInt(idCapituloLimpio) <= parseInt(ultimoCapituloLeido)
-                      : false;
-                    
-                    return (
-                      <div 
-                        key={cap.id}
-                        className="group flex items-center justify-between p-3.5 bg-[#0F1422]/40 hover:bg-[#0F1422]/90 border border-gray-900/60 hover:border-gray-800 rounded-xl transition-all"
-                      >
-                        <Link 
-                          href={`/ver/${manga.id}/${idCapituloLimpio}`}
-                          className="flex items-center gap-3 flex-1 cursor-pointer"
-                        >
-                          {/* El contenedor cambia a borde y fondo rojo si está leído */}
-                          <div className={`p-2 rounded-lg transition-colors ${
-                            esLeido 
-                              ? 'bg-red-500/10 text-red-500 border border-red-500/20' 
-                              : 'bg-gray-800/40 text-gray-500 group-hover:text-white group-hover:bg-red-500/10'
-                          }`}>
-                            <Eye 
-                              size={14} 
-                              className={esLeido ? "text-red-500 fill-red-500/10" : "group-hover:text-red-400"} 
-                            />
-                          </div>
-                          <div>
-                            <span className={`text-xs font-bold transition-colors ${
-                              esLeido ? 'text-red-400 font-black' : 'text-gray-300 group-hover:text-white'
-                            }`}>
-                              Capítulo {cap.id} {esLeido && <span className="text-[10px] ml-1.5 opacity-60 text-red-500 font-medium">(Leído)</span>}
-                            </span>
-                            {cap.titulo && (
-                              <p className="text-[10px] text-gray-500 font-medium mt-0.5 group-hover:text-gray-400">
-                                {cap.titulo}
-                              </p>
-                            )}
-                          </div>
-                        </Link>
-                        <span className="text-[10px] text-gray-500 font-medium shrink-0">
-                          {cap.fecha || 'Reciente'}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Botón Ver Más */}
-                {manga.capitulos.length > 5 && (
-                  <button
-                    onClick={() => setMostrarTodos(!mostrarTodos)}
-                    className="w-full mt-4 py-2.5 bg-[#0F1422]/20 border border-gray-900 hover:border-gray-800 rounded-xl text-xs font-black uppercase text-gray-400 hover:text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    {mostrarTodos ? (
-                      <>Ver Menos <ChevronUp size={14} /></>
-                    ) : (
-                      <>Ver Más ({manga.capitulos.length - 5} más) <ChevronDown size={14} /></>
-                    )}
-                  </button>
-                )}
-              </div>
-
-              {/* Sección de Comentarios */}
-              <div className="border-t border-gray-900/60 pt-10">
-                <h2 className="text-xs font-black text-white uppercase tracking-wider mb-6 flex items-center gap-2">
-                  <span className="w-1 h-3.5 bg-red-500 rounded-full" />
-                  Comentarios ({comentarios.length})
-                </h2>
-
-                <form onSubmit={enviarComentario} className="mb-8">
-                  <div className="relative bg-[#0F1422]/60 border border-gray-900 rounded-xl focus-within:border-gray-800 transition-all p-2 flex items-end gap-2">
-                    <textarea
-                      value={nuevoComentario}
-                      onChange={(e) => setNuevoComentario(e.target.value)}
-                      placeholder="Escribe tu opinión sobre este manhwa..."
-                      rows={3}
-                      className="w-full bg-transparent text-xs text-gray-200 placeholder-gray-600 outline-none resize-none p-2 font-medium"
-                    />
-                    <button
-                      type="submit"
-                      disabled={!nuevoComentario.trim()}
-                      className="p-2.5 bg-red-500 hover:bg-red-600 disabled:opacity-20 disabled:hover:bg-red-500 text-white rounded-lg transition-all cursor-pointer shrink-0"
-                    >
-                      <Send size={14} />
-                    </button>
-                  </div>
-                </form>
-
-                <div className="flex flex-col gap-4">
-                  {comentarios.map((com) => (
-                    <div key={com.id} className="p-4 bg-[#0F1422]/20 border border-gray-900/40 rounded-xl flex gap-3 items-start animate-in fade-in slide-in-from-bottom-2 duration-300">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-red-600 to-orange-500 flex items-center justify-center text-[10px] font-black text-white shrink-0 uppercase tracking-wider">
-                        {com.usuario.substring(0, 2)}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between gap-2 mb-1">
-                          <span className="text-xs font-black text-white">{com.usuario}</span>
-                          <span className="text-[9px] text-gray-600 font-bold tracking-wide uppercase">{com.fecha}</span>
-                        </div>
-                        <p className="text-xs text-gray-400 font-medium leading-relaxed">
-                          {com.texto}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-              </div>
-
-            </div>
-
-            <div className="hidden lg:block">
-              {/* Lateral libre */}
-            </div>
-
-          </div>
         </div>
       </div>
-
       <Footer />
     </main>
   );
