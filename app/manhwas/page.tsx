@@ -1,173 +1,208 @@
-// src/app/manhwas/page.tsx
+// src/app/manhwas/[id]/[capitulo]/page.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import React, { useEffect, useState } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import MangaCard from '@/components/MangaCard';
 import { BASE_DATOS_MANGAS } from '@/data/mangas';
-import { Search, SlidersHorizontal, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Menu, Loader2, RefreshCw } from 'lucide-react';
 
-export default function CatatogoPage() {
-  const searchParams = useSearchParams();
+export default function LectorPage() {
   const router = useRouter();
+  const params = useParams();
   
-  // Leer el género desde la URL (ej: ?genero=accion)
-  const generoQuery = searchParams?.get('genero') || '';
+  // Convertir parámetros de la URL de forma segura
+  const mangaId = params?.id as string;
+  const capId = params?.capitulo as string;
 
-  // Estados
-  const [busqueda, setBusqueda] = useState<string>('');
-  const [generoSeleccionado, setGeneroSeleccionado] = useState<string>(generoQuery);
-  const [mangasFiltrados, setMangasFiltrados] = useState<any[]>(BASE_DATOS_MANGAS);
+  // Estados de carga y almacenamiento de datos
+  const [loadingData, setLoadingData] = useState<boolean>(true);
+  const [loadingImages, setLoadingImages] = useState<boolean>(true);
+  const [manga, setManga] = useState<any>(null);
+  const [capituloActual, setCapituloActual] = useState<any>(null);
 
-  // Sincronizar el estado local si el género cambia desde el Navbar
   useEffect(() => {
-    setGeneroSeleccionado(generoQuery);
-  }, [generoQuery]);
+    // Inicializamos estados de carga al cambiar de capítulo
+    setLoadingData(true);
+    setLoadingImages(true);
 
-  // Lógica de filtrado combinada (Buscador + Género)
+    const timer = setTimeout(() => {
+      const mangaEncontrado = BASE_DATOS_MANGAS.find((m) => m.id === mangaId);
+      if (mangaEncontrado) {
+        setManga(mangaEncontrado);
+        
+        // Mapeo seguro usando tipado flexible para evitar conflictos con la BD
+        const caps = (mangaEncontrado as any).capitulos || (mangaEncontrado as any).chapters || [];
+        const capEncontrado = caps.find((c: any) => String(c.id) === String(capId) || String(c.numero) === String(capId));
+        
+        setCapituloActual(capEncontrado || null);
+
+        // Guardar automáticamente el progreso de lectura en LocalStorage para el perfil
+        if (capEncontrado) {
+          const progresoRaw = localStorage.getItem('sumi_progreso') || '{}';
+          try {
+            const progreso = JSON.parse(progresoRaw);
+            progreso[mangaId] = capId; // Mapea este manga con su último capítulo leído
+            localStorage.setItem('sumi_progreso', JSON.stringify(progreso));
+          } catch (e) {
+            console.error('Error guardando progreso:', e);
+          }
+        }
+      }
+      setLoadingData(false);
+    }, 400); // Pequeña ventana de tiempo para sincronizar estados fluidamente
+
+    return () => clearTimeout(timer);
+  }, [mangaId, capId]);
+
+  // Buscar índices para la paginación (Siguiente / Anterior)
+  const listaCapitulos = manga?.capitulos || manga?.chapters || [];
+  const indexActual = listaCapitulos.findIndex((c: any) => String(c.id) === String(capId));
+  const capAnterior = indexActual > 0 ? listaCapitulos[indexActual - 1] : null;
+  const capSiguiente = indexActual < listaCapitulos.length - 1 ? listaCapitulos[indexActual + 1] : null;
+
+  // Manejar la precarga completa de las imágenes pesadas del Manhwa
   useEffect(() => {
-    let resultado = BASE_DATOS_MANGAS;
+    if (!loadingData && capituloActual?.paginas?.length) {
+      let imagenesCargadas = 0;
+      const totalImagenes = capituloActual.paginas.length;
 
-    // Filtro por término de búsqueda
-    if (busqueda.trim() !== '') {
-      resultado = resultado.filter((manga: any) => // 🆕 Añadimos ': any' aquí
-        manga.titulo.toLowerCase().includes(busqueda.toLowerCase()) ||
-        manga.autor.toLowerCase().includes(busqueda.toLowerCase())
-      );
+      capituloActual.paginas.forEach((src: string) => {
+        const img = new Image();
+        img.src = src;
+        img.onload = () => {
+          imagenesCargadas++;
+          if (imagenesCargadas === totalImagenes) {
+            setLoadingImages(false); // Apaga el loader sólo cuando estén renderizadas en buffer
+          }
+        };
+        img.onerror = () => {
+          imagenesCargadas++;
+          if (imagenesCargadas === totalImagenes) {
+            setLoadingImages(false);
+          }
+        };
+      });
+    } else if (!loadingData && !capituloActual?.paginas?.length) {
+      setLoadingImages(false);
     }
+  }, [loadingData, capituloActual]);
 
-    // Filtro por género de la URL/Botón
-    if (generoSeleccionado !== '') {
-      resultado = resultado.filter((manga: any) => // 🆕 Añadimos ': any' aquí
-        manga.generos?.some((g: string) => g.toLowerCase() === generoSeleccionado.toLowerCase())
-      );
-    }
-
-    setMangasFiltrados(resultado);
-    }, [busqueda, generoSeleccionado]);
-
-  // Cambiar género y actualizar la URL de forma limpia
-  const manejarCambioGenero = (genero: string) => {
-    setGeneroSeleccionado(genero);
-    if (genero === '') {
-      router.push('/manhwas');
-    } else {
-      router.push(`/manhwas?genero=${genero.toLowerCase()}`);
-    }
-  };
-
-  // Limpiar todos los filtros activos
-  const limpiarFiltros = () => {
-    setBusqueda('');
-    setGeneroSeleccionado('');
-    router.push('/manhwas');
-  };
+  // Renderizado de error si el contenido no existe en data/mangas.ts
+  if (!loadingData && (!manga || !capituloActual)) {
+    return (
+      <div className="min-h-screen bg-[#05070B] text-white flex flex-col justify-between">
+        <Navbar />
+        <div className="text-center py-32 px-4">
+          <h2 className="text-sm font-black uppercase tracking-widest text-red-500 mb-2">Contenido no disponible</h2>
+          <p className="text-xs text-gray-500 max-w-xs mx-auto mb-6">El manhwa o capítulo que buscas no existe en el catálogo.</p>
+          <Link href="/" className="inline-block bg-gray-900 border border-gray-800 text-xs font-bold uppercase tracking-wider px-6 py-3 rounded-xl hover:bg-gray-800 transition-all">
+            Volver al inicio
+          </Link>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
-    <main className="min-h-screen bg-[#0B0F19] text-gray-200 flex flex-col justify-between">
+    <main className="min-h-screen bg-[#020306] text-gray-200 flex flex-col justify-between selection:bg-red-600 selection:text-white">
       <div>
         <Navbar />
 
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-32 mb-20">
-          
-          {/* BARRA DE BÚSQUEDA Y CONTROL DE FILTROS */}
-          <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-[#0F1422]/60 border border-gray-900 p-4 rounded-2xl shadow-xl mb-10">
-            
-            {/* Input Buscador */}
-            <div className="relative w-full md:w-96">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-              <input
-                type="text"
-                placeholder="Buscar por título o autor..."
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                className="w-full bg-[#070A12] border border-gray-800 focus:border-red-500/50 rounded-xl pl-10 pr-4 py-2.5 text-xs font-medium text-white placeholder-gray-500 outline-none transition-colors"
-              />
-              {busqueda && (
-                <button 
-                  onClick={() => setBusqueda('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white cursor-pointer"
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
+        {/* TOP BAR FIXED (Control de lectura superior) */}
+        <div className="fixed top-16 left-0 right-0 h-14 bg-[#05070B]/80 backdrop-blur-md border-b border-gray-900/60 z-40 flex items-center justify-between px-4 max-w-5xl mx-auto rounded-b-xl shadow-xl shadow-black/20">
+          <Link href={`/manhwas/${mangaId}`} className="flex items-center gap-2 text-xs font-bold text-gray-400 hover:text-white transition-colors max-w-[40%] truncate">
+            <ArrowLeft size={14} className="text-red-500" />
+            <span className="uppercase tracking-wider truncate">{manga?.titulo || manga?.title}</span>
+          </Link>
 
-            {/* Píldoras de Filtros Rápidos */}
-            <div className="flex flex-wrap gap-2 items-center w-full md:w-auto justify-start md:justify-end">
-              <div className="text-gray-500 p-2 hidden sm:block">
-                <SlidersHorizontal size={16} />
-              </div>
-              
-              <button
-                onClick={() => manejarCambioGenero('')}
-                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer border ${
-                  generoSeleccionado === ''
-                    ? 'bg-red-500 border-red-500 text-white shadow-lg shadow-red-500/10'
-                    : 'bg-[#070A12] border-gray-800 text-gray-400 hover:text-white hover:border-gray-700'
-                }`}
-              >
-                Todos
-              </button>
-
-              {['Accion', 'Isekai', 'Romance'].map((gen) => (
-                <button
-                  key={gen}
-                  onClick={() => manejarCambioGenero(gen)}
-                  className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer border ${
-                    generoSeleccionado.toLowerCase() === gen.toLowerCase()
-                      ? 'bg-red-500 border-red-500 text-white shadow-lg shadow-red-500/10'
-                      : 'bg-[#070A12] border-gray-800 text-gray-400 hover:text-white hover:border-gray-700'
-                  }`}
-                >
-                  {gen === 'Accion' ? 'Acción' : gen}
-                </button>
-              ))}
-            </div>
+          <div className="text-xs font-black uppercase tracking-widest text-white bg-gray-900/50 border border-gray-800 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+            <Menu size={12} className="text-red-500" />
+            <span>Cap. {capituloActual?.numero || capId}</span>
           </div>
 
-          {/* INDICADOR DE FILTRO ACTIVO */}
-          {(generoSeleccionado || busqueda) && (
-            <div className="flex items-center justify-between mb-6 bg-blue-500/5 border border-blue-500/10 px-4 py-2.5 rounded-xl text-xs text-gray-400">
-              <div>
-                Resultados para:{' '}
-                {busqueda && <span className="text-white font-bold">"{busqueda}"</span>}
-                {busqueda && generoSeleccionado && ' + '}
-                {generoSeleccionado && (
-                  <span className="text-red-400 font-bold uppercase tracking-wider">
-                    {generoSeleccionado === 'accion' ? 'Acción' : generoSeleccionado}
-                  </span>
-                )}
-              </div>
-              <button 
-                onClick={limpiarFiltros}
-                className="text-blue-400 hover:text-blue-300 font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer"
-              >
-                Limpiar todo <X size={14} />
-              </button>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {capAnterior ? (
+              <Link href={`/manhwas/${mangaId}/${capAnterior.id}`} className="p-2 bg-gray-900 border border-gray-800 hover:border-red-500 text-gray-400 hover:text-white rounded-lg transition-all">
+                <ArrowLeft size={14} />
+              </Link>
+            ) : (
+              <div className="p-2 bg-gray-900/30 border border-gray-900/10 text-gray-700 rounded-lg cursor-not-allowed"><ArrowLeft size={14} /></div>
+            )}
 
-          {/* CUADRÍCULA DE RESULTADOS */}
-          {mangasFiltrados.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-4 gap-y-8">
-              {mangasFiltrados.map((manga) => (
-                <MangaCard key={manga.id} manga={manga} />
-              ))}
+            {capSiguiente ? (
+              <Link href={`/manhwas/${mangaId}/${capSiguiente.id}`} className="p-2 bg-gray-900 border border-gray-800 hover:border-red-500 text-gray-400 hover:text-white rounded-lg transition-all">
+                <ArrowRight size={14} />
+              </Link>
+            ) : (
+              <div className="p-2 bg-gray-900/30 border border-gray-900/10 text-gray-700 rounded-lg cursor-not-allowed"><ArrowRight size={14} /></div>
+            )}
+          </div>
+        </div>
+
+        {/* LECTOR EN CASCADA COMPLETO */}
+        <div className="pt-36 pb-20 max-w-3xl mx-auto px-0 sm:px-4 flex flex-col items-center min-h-[70vh] justify-center">
+          
+          {/* ESTRUCTURA DE CARGA TIPO SKELETON */}
+          {(loadingData || loadingImages) ? (
+            <div className="w-full space-y-4 animate-pulse px-4">
+              <div className="flex flex-col items-center justify-center py-12 text-center text-gray-600">
+                <Loader2 size={24} className="animate-spin text-red-600 mb-2" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Optimizando imágenes...</span>
+              </div>
+              <div className="w-full h-96 bg-[#0F1422]/20 border border-gray-900/50 rounded-xl" />
+              <div className="w-full h-96 bg-[#0F1422]/20 border border-gray-900/50 rounded-xl" />
             </div>
           ) : (
-            /* No se encontraron resultados */
-            <div className="py-24 text-center max-w-sm mx-auto">
-              <h3 className="text-sm font-black text-white uppercase tracking-wider">No hay coincidencias</h3>
-              <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-                No encontramos ningún manhwa que coincida con los filtros seleccionados. Intenta buscando con otro término.
-              </p>
+            /* RENDER DE VIÑETAS REALES SIN CORTES */
+            <div className="w-full flex flex-col items-center bg-black/40 shadow-2xl shadow-black/80 rounded-2xl overflow-hidden border border-gray-900/30">
+              {capituloActual?.paginas?.map((url: string, index: number) => (
+                <img
+                  key={index}
+                  src={url}
+                  alt={`Hoja ${index + 1}`}
+                  loading="lazy"
+                  className="w-full h-auto object-contain block select-none pointer-events-none"
+                />
+              ))}
             </div>
           )}
-
         </div>
+
+        {/* BOTTOM NAVIGATION (Controles de pie de página) */}
+        {!loadingData && !loadingImages && (
+          <div className="max-w-md mx-auto px-4 pb-20 flex flex-col items-center gap-4">
+            <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Capítulo leído completo</p>
+            <div className="w-full grid grid-cols-2 gap-4">
+              {capAnterior ? (
+                <Link href={`/manhwas/${mangaId}/${capAnterior.id}`} className="bg-[#0F1422]/40 border border-gray-900 hover:border-gray-800 p-4 rounded-xl flex flex-col items-center justify-center gap-1 group transition-all">
+                  <ArrowLeft size={16} className="text-gray-500 group-hover:text-red-500 transition-colors" />
+                  <span className="text-[9px] font-black uppercase tracking-wider text-gray-500">Anterior</span>
+                </Link>
+              ) : (
+                <div className="bg-gray-900/10 border border-gray-900/50 p-4 rounded-xl opacity-40 flex flex-col items-center justify-center gap-1 cursor-not-allowed">
+                  <ArrowLeft size={16} className="text-gray-700" />
+                  <span className="text-[9px] font-black uppercase tracking-wider text-gray-700">Llegaste al inicio</span>
+                </div>
+              )}
+
+              {capSiguiente ? (
+                <Link href={`/manhwas/${mangaId}/${capSiguiente.id}`} className="bg-red-600 hover:bg-red-500 shadow-xl shadow-red-600/10 p-4 rounded-xl flex flex-col items-center justify-center gap-1 group transition-all">
+                  <ArrowRight size={16} className="text-white" />
+                  <span className="text-[9px] font-black uppercase tracking-wider text-white">Siguiente</span>
+                </Link>
+              ) : (
+                <Link href={`/manhwas/${mangaId}`} className="bg-[#0F1422]/40 border border-gray-900 hover:border-gray-800 p-4 rounded-xl flex flex-col items-center justify-center gap-1 group transition-all">
+                  <RefreshCw size={16} className="text-gray-500 group-hover:text-orange-500 transition-colors" />
+                  <span className="text-[9px] font-black uppercase tracking-wider text-gray-500">Volver a Ficha</span>
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <Footer />

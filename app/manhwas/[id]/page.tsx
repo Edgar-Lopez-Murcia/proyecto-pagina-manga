@@ -7,7 +7,7 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { BASE_DATOS_MANGAS } from '@/data/mangas';
-import { Star, BookOpen, Heart, Eye, ChevronDown, ChevronUp, MessageSquare, Send } from 'lucide-react';
+import { Star, BookOpen, Heart, Eye, ChevronDown, ChevronUp, Send } from 'lucide-react';
 
 interface Comentario {
   id: string;
@@ -23,7 +23,9 @@ export default function DetalleManhwaPage() {
   // Estados esenciales de interfaz
   const [mostrarTodos, setMostrarTodos] = useState<boolean>(false);
   const [esFavorito, setEsFavorito] = useState<boolean>(false);
-  const [capitulosLeidos, setCapitulosLeidos] = useState<string[]>([]);
+  
+  // Registra el último capítulo guardado en el historial de lectura
+  const [ultimoCapituloLeido, setUltimoCapituloLeido] = useState<string | null>(null);
   
   // Estado para el sistema interactivo de comentarios
   const [comentarios, setComentarios] = useState<Comentario[]>([
@@ -35,7 +37,7 @@ export default function DetalleManhwaPage() {
   // 1. Buscamos el manhwa en la base de datos simulada
   const mangaRaw = BASE_DATOS_MANGAS.find((m) => m.id === idManga) as any;
 
-  // 2. 🛡️ ESCUDO DE DATOS INALIK: Mapea inglés/español de forma segura e inyecta fallbacks si está vacío
+  // 2. Mapeo seguro de datos con fallbacks para evitar errores si faltan campos
   const manga = mangaRaw ? {
     id: mangaRaw.id,
     titulo: mangaRaw.titulo || mangaRaw.title || 'Sin título',
@@ -64,10 +66,13 @@ export default function DetalleManhwaPage() {
       setEsFavorito(listaIds.includes(idManga));
     }
 
-    // Cargar capítulos leídos
-    const leidos = localStorage.getItem(`leidos-${idManga}`);
-    if (leidos) {
-      setCapitulosLeidos(JSON.parse(leidos));
+    // Recuperar el punto exacto de continuación de lectura
+    const historial = localStorage.getItem('sumi_progreso');
+    if (historial) {
+      const progreso = JSON.parse(historial);
+      if (progreso[idManga]) {
+        setUltimoCapituloLeido(progreso[idManga].toString());
+      }
     }
   }, [idManga]);
 
@@ -88,7 +93,7 @@ export default function DetalleManhwaPage() {
     window.dispatchEvent(new Event('favoritosActualizados'));
   };
 
-  // 5. Agregar un nuevo comentario a la lista en tiempo real
+  // 5. Agregar un nuevo comentario a la lista
   const enviarComentario = (e: React.FormEvent) => {
     e.preventDefault();
     if (!nuevoComentario.trim()) return;
@@ -117,8 +122,12 @@ export default function DetalleManhwaPage() {
     );
   }
 
-  // Lógica de filtrado de "Ver Más": Muestra solo 5 elementos o el array completo
+  // Configuración del paginador de capítulos ("Ver Más")
   const capitulosVisibles = mostrarTodos ? manga.capitulos : manga.capitulos.slice(0, 5);
+
+  // Destino del botón principal de lectura (Historial o Capítulo 1)
+  const primerCapituloId = manga.capitulos[0]?.id?.toString() || '1';
+  const destinoLecturaId = ultimoCapituloLeido || primerCapituloId;
 
   return (
     <main className="min-h-screen bg-[#0B0F19] text-gray-200 flex flex-col justify-between selection:bg-red-500/20 selection:text-red-400">
@@ -168,14 +177,19 @@ export default function DetalleManhwaPage() {
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3 mt-8 max-w-md">
+                {/* BOTÓN PRINCIPAL DINÁMICO */}
                 <Link
-                  href={`/ver/${manga.id}/capitulo-1`}
+                  href={`/ver/${manga.id}/${destinoLecturaId}`}
                   className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-red-500/10 text-center flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M5 3l14 9-14 9V3z"/>
                   </svg>
-                  Empezar a leer
+                  {ultimoCapituloLeido ? (
+                    <span>Continuar cap. {ultimoCapituloLeido}</span>
+                  ) : (
+                    <span>Empezar a leer</span>
+                  )}
                 </Link>
 
                 <button
@@ -198,7 +212,7 @@ export default function DetalleManhwaPage() {
             
             <div className="lg:col-span-2 flex flex-col gap-12">
               
-              {/* Bloque 1: Sinopsis */}
+              {/* Sinopsis */}
               <div>
                 <h2 className="text-xs font-black text-white uppercase tracking-wider mb-4 flex items-center gap-2">
                   <span className="w-1 h-3.5 bg-red-500 rounded-full" />
@@ -209,7 +223,7 @@ export default function DetalleManhwaPage() {
                 </p>
               </div>
 
-              {/* Bloque 2: Lista de Capítulos con Marcador de Lectura */}
+              {/* LISTA DE CAPÍTULOS CON OJITO ROJO DINÁMICO */}
               <div>
                 <h2 className="text-xs font-black text-white uppercase tracking-wider mb-6 flex items-center gap-2">
                   <span className="w-1 h-3.5 bg-red-500 rounded-full" />
@@ -218,9 +232,12 @@ export default function DetalleManhwaPage() {
 
                 <div className="flex flex-col gap-2.5">
                   {capitulosVisibles.map((cap: any) => {
-                    // Forzamos string para blindar comparaciones seguras de tipo
                     const idCapituloLimpio = (cap.id || '').toString();
-                    const esLeido = capitulosLeidos.map(String).includes(idCapituloLimpio);
+                    
+                    // Condición: El capítulo es marcado como leído si su número es menor o igual al último guardado
+                    const esLeido = ultimoCapituloLeido 
+                      ? parseInt(idCapituloLimpio) <= parseInt(ultimoCapituloLeido)
+                      : false;
                     
                     return (
                       <div 
@@ -228,22 +245,25 @@ export default function DetalleManhwaPage() {
                         className="group flex items-center justify-between p-3.5 bg-[#0F1422]/40 hover:bg-[#0F1422]/90 border border-gray-900/60 hover:border-gray-800 rounded-xl transition-all"
                       >
                         <Link 
-                          href={`/ver/${manga.id}/capitulo-${idCapituloLimpio}`}
+                          href={`/ver/${manga.id}/${idCapituloLimpio}`}
                           className="flex items-center gap-3 flex-1 cursor-pointer"
                         >
-                          {/* Caja de icono dinámico: cambia a verde si está leído */}
+                          {/* El contenedor cambia a borde y fondo rojo si está leído */}
                           <div className={`p-2 rounded-lg transition-colors ${
                             esLeido 
-                              ? 'bg-green-500/10 text-green-400 border border-green-500/20' 
+                              ? 'bg-red-500/10 text-red-500 border border-red-500/20' 
                               : 'bg-gray-800/40 text-gray-500 group-hover:text-white group-hover:bg-red-500/10'
                           }`}>
-                            <Eye size={14} className={esLeido ? "text-green-400" : "group-hover:text-red-400"} />
+                            <Eye 
+                              size={14} 
+                              className={esLeido ? "text-red-500 fill-red-500/10" : "group-hover:text-red-400"} 
+                            />
                           </div>
                           <div>
                             <span className={`text-xs font-bold transition-colors ${
-                              esLeido ? 'text-green-400 font-black' : 'text-gray-300 group-hover:text-white'
+                              esLeido ? 'text-red-400 font-black' : 'text-gray-300 group-hover:text-white'
                             }`}>
-                              Capítulo {cap.id} {esLeido && <span className="text-[10px] ml-1.5 opacity-80">(Leído)</span>}
+                              Capítulo {cap.id} {esLeido && <span className="text-[10px] ml-1.5 opacity-60 text-red-500 font-medium">(Leído)</span>}
                             </span>
                             {cap.titulo && (
                               <p className="text-[10px] text-gray-500 font-medium mt-0.5 group-hover:text-gray-400">
@@ -260,7 +280,7 @@ export default function DetalleManhwaPage() {
                   })}
                 </div>
 
-                {/* Botón Ver Más interactivo */}
+                {/* Botón Ver Más */}
                 {manga.capitulos.length > 5 && (
                   <button
                     onClick={() => setMostrarTodos(!mostrarTodos)}
@@ -275,14 +295,13 @@ export default function DetalleManhwaPage() {
                 )}
               </div>
 
-              {/* Bloque 3: Sección de Comentarios (Ubicada Abajo) */}
+              {/* Sección de Comentarios */}
               <div className="border-t border-gray-900/60 pt-10">
                 <h2 className="text-xs font-black text-white uppercase tracking-wider mb-6 flex items-center gap-2">
                   <span className="w-1 h-3.5 bg-red-500 rounded-full" />
                   Comentarios ({comentarios.length})
                 </h2>
 
-                {/* Formulario de comentarios */}
                 <form onSubmit={enviarComentario} className="mb-8">
                   <div className="relative bg-[#0F1422]/60 border border-gray-900 rounded-xl focus-within:border-gray-800 transition-all p-2 flex items-end gap-2">
                     <textarea
@@ -302,7 +321,6 @@ export default function DetalleManhwaPage() {
                   </div>
                 </form>
 
-                {/* Lista de renders de comentarios publicados */}
                 <div className="flex flex-col gap-4">
                   {comentarios.map((com) => (
                     <div key={com.id} className="p-4 bg-[#0F1422]/20 border border-gray-900/40 rounded-xl flex gap-3 items-start animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -326,9 +344,8 @@ export default function DetalleManhwaPage() {
 
             </div>
 
-            {/* Columna Derecha Estética (Espacio lateral) */}
             <div className="hidden lg:block">
-              {/* Reservado para futuras integraciones */}
+              {/* Lateral libre */}
             </div>
 
           </div>
