@@ -1,13 +1,35 @@
 // src/app/page.tsx
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { sesionValida } from '@/lib/auth';
 import Navbar from '@/components/Navbar';
 import HeroSlider from '@/components/HeroSlider';
 import ContinuarLeyendo from '@/components/ContinuarLeyendo';
 import Footer from '@/components/Footer';
 import Link from 'next/link';
 import { BASE_DATOS_MANGAS } from '@/data/mangas';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, Loader2 } from 'lucide-react';
 
 export default function HomePage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    // Si no hay sesión válida, redirigir a landing
+    if (!sesionValida()) {
+      router.push('/auth/landing');
+    }
+  }, [router]);
+
+  // Mostrar loading mientras se valida sesión
+  if (!sesionValida()) {
+    return (
+      <div className="min-h-screen bg-[#05070B] flex items-center justify-center">
+        <Loader2 size={32} className="animate-spin text-red-600" />
+      </div>
+    );
+  }
   return (
     <main className="min-h-screen bg-[#05070B] text-gray-200 flex flex-col justify-between">
       <div>

@@ -57,7 +57,7 @@ export default function ContinuarLeyendo() {
         {progresos.map((item) => (
           <Link
             key={item.id}
-            href={`/ver/${item.id}/${item.capituloGuardado}`}
+            href={`/manhwuas/${item.id}/${item.capituloGuardado}`}
             className="group relative bg-[#0F1422]/30 border border-gray-900/60 rounded-lg overflow-hidden hover:border-red-500/20 transition-all duration-300"
           >
             {/* Contenedor de la Imagen */}

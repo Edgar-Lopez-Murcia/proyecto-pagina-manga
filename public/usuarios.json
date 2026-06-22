@@ -1,0 +1,17 @@
+{
+  "usuarios": [
+    {
+      "id": "user-demo-001",
+      "nombre": "ByInalik",
+      "email": "demo@sumi.app",
+      "contraseña": "demo123",
+      "fechaRegistro": "2026-06-22T10:30:00Z",
+      "avatar": null,
+      "preferencias": {
+        "temaOscuro": true,
+        "notificaciones": true,
+        "idioma": "es"
+      }
+    }
+  ]
+}
