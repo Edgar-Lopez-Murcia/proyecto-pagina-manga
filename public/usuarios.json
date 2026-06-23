@@ -12,6 +12,19 @@
         "notificaciones": true,
         "idioma": "es"
       }
+    },
+    {
+      "id": "user-1782231144613",
+      "nombre": "Edgar-Lopez",
+      "email": "edgar@gmail.com",
+      "contraseña": "3064978c804a1b40e90a0074488eb2404e454d7e9132a1c64bb0dce246e2b0db",
+      "fechaRegistro": "2026-06-23T16:12:24.613Z",
+      "avatar": null,
+      "preferencias": {
+        "temaOscuro": true,
+        "notificaciones": true,
+        "idioma": "es"
+      }
     }
   ]
 }

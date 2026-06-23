@@ -37,9 +37,17 @@ export function crearSesion(usuario: Usuario): void {
 
 // ✅ OBTENER SESIÓN
 export function obtenerSesion(): Sesion | null {
+  // Evita errores cuando el código se ejecuta en el servidor
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
   try {
     const sesionRaw = localStorage.getItem(CLAVE_SESION);
-    if (!sesionRaw) return null;
+
+    if (!sesionRaw) {
+      return null;
+    }
 
     const sesion: Sesion = JSON.parse(sesionRaw);
     return sesion;
@@ -69,32 +77,7 @@ export function sesionValida(): boolean {
   }
 }
 
-// ✅ VALIDAR EMAIL
-export function validarEmail(email: string): boolean {
-  const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return regex.test(email);
-}
 
-// ✅ VALIDAR CONTRASEÑA
-export function validarContraseña(password: string): {
-  valida: boolean;
-  errores: string[];
-} {
-  const errores: string[] = [];
-
-  if (password.length < 6) {
-    errores.push('La contraseña debe tener al menos 6 caracteres');
-  }
-
-  if (!/\d/.test(password)) {
-    errores.push('La contraseña debe contener al menos 1 número');
-  }
-
-  return {
-    valida: errores.length === 0,
-    errores,
-  };
-}
 
 // ✅ GENERAR ID ÚNICO
 export function generarId(): string {

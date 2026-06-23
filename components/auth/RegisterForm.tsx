@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { crearSesion, validarEmail, validarContraseña } from '@/lib/auth';
+import { crearSesion } from '@/lib/auth';
+import { validarEmail, validarContraseña } from '@/lib/validaciones';
 
 export default function RegisterForm() {
   const router = useRouter();
@@ -100,7 +101,7 @@ export default function RegisterForm() {
             placeholder="NOMBRE DE USUARIO"
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
-            className="w-full bg-[#05070B] border border-gray-900 hover:border-gray-800 focus:border-red-600 px-4 py-3 rounded-xl text-xs font-bold text-white placeholder-gray-700 focus:outline-none transition-all uppercase tracking-widest"
+            className="w-full bg-[#05070B] border border-gray-900 hover:border-gray-800 focus:border-red-600 px-4 py-3 rounded-xl text-xs font-bold text-white placeholder-gray-700 focus:outline-none transition-all tracking-widest"
           />
         </div>
 
@@ -111,7 +112,7 @@ export default function RegisterForm() {
             placeholder="CORREO ELECTRÓNICO"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full bg-[#05070B] border border-gray-900 hover:border-gray-800 focus:border-red-600 px-4 py-3 rounded-xl text-xs font-bold text-white placeholder-gray-700 focus:outline-none transition-all uppercase tracking-widest"
+            className="w-full bg-[#05070B] border border-gray-900 hover:border-gray-800 focus:border-red-600 px-4 py-3 rounded-xl text-xs font-bold text-white placeholder-gray-700 focus:outline-none transition-all tracking-widest"
           />
         </div>
 
@@ -122,7 +123,7 @@ export default function RegisterForm() {
             placeholder="CONTRASEÑA"
             value={contraseña}
             onChange={handleChangeContraseña}
-            className="w-full bg-[#05070B] border border-gray-900 hover:border-gray-800 focus:border-red-600 px-4 py-3 rounded-xl text-xs font-bold text-white placeholder-gray-700 focus:outline-none transition-all uppercase tracking-widest"
+            className="w-full bg-[#05070B] border border-gray-900 hover:border-gray-800 focus:border-red-600 px-4 py-3 rounded-xl text-xs font-bold text-white placeholder-gray-700 focus:outline-none transition-all tracking-widest"
           />
           {/* INDICADOR DE FORTALEZA */}
           <div className="mt-2 h-1 bg-gray-900 rounded-full overflow-hidden">
@@ -150,7 +151,7 @@ export default function RegisterForm() {
             placeholder="CONFIRMAR CONTRASEÑA"
             value={confirmar}
             onChange={(e) => setConfirmar(e.target.value)}
-            className="w-full bg-[#05070B] border border-gray-900 hover:border-gray-800 focus:border-red-600 px-4 py-3 rounded-xl text-xs font-bold text-white placeholder-gray-700 focus:outline-none transition-all uppercase tracking-widest"
+            className="w-full bg-[#05070B] border border-gray-900 hover:border-gray-800 focus:border-red-600 px-4 py-3 rounded-xl text-xs font-bold text-white placeholder-gray-700 focus:outline-none transition-all tracking-widest"
           />
         </div>
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { crearUsuario } from '@/lib/usuarios';
-import { validarEmail, validarContraseña } from '@/lib/auth';
+import { validarEmail, validarContraseña } from '@/lib/validaciones';
 
 export async function POST(request: NextRequest) {
   try {

@@ -1,7 +1,7 @@
 // src/app/page.tsx
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { sesionValida } from '@/lib/auth';
 import Navbar from '@/components/Navbar';
@@ -14,16 +14,20 @@ import { BookOpen, Loader2 } from 'lucide-react';
 
 export default function HomePage() {
   const router = useRouter();
+  const [sesionVerificada, setSesionVerificada] = useState(false);
 
   useEffect(() => {
-    // Si no hay sesión válida, redirigir a landing
-    if (!sesionValida()) {
-      router.push('/auth/landing');
+    const tieneSesion = sesionValida();
+
+    if (!tieneSesion) {
+    router.push('/auth/landing');
+    } else {
+    setSesionVerificada(true);
     }
   }, [router]);
 
   // Mostrar loading mientras se valida sesión
-  if (!sesionValida()) {
+  if (!sesionVerificada) {
     return (
       <div className="min-h-screen bg-[#05070B] flex items-center justify-center">
         <Loader2 size={32} className="animate-spin text-red-600" />
