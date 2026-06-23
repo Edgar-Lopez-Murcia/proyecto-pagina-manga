@@ -85,7 +85,7 @@ export default function LoginForm() {
             placeholder="CONTRASEÑA"
             value={contraseña}
             onChange={(e) => setContraseña(e.target.value)}
-            className="w-full bg-[#05070B] border border-gray-900 hover:border-gray-800 focus:border-red-600 px-4 py-3 rounded-xl text-xs font-bold text-white placeholder-gray-700 focus:outline-none transition-all tracking-widest"
+            className="w-full bg-[#05070B] border border-gray-900 hover:border-gray-800 focus:border-red-600 px-4 py-3 rounded-xl text-xs font-bold text-white placeholder-gray-700 focus:outline-none transition-all. tracking-widest"
           />
         </div>
 
