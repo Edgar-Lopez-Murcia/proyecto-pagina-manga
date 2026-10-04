@@ -1,20 +1,29 @@
-// src/types/index.ts
+export interface Chapter {
+  id: string;
+  number: number;
+  title: string;
+  pages: string[];
+  createdAt: string;
+}
 
 export interface Manga {
   id: string;
   title: string;
   coverUrl: string;
-  type: 'Manhwa' | 'Manga' | 'Novela';
+  description: string;
+  author: string;
+  status: "ongoing" | "completed" | "hiatus";
+  type: "Manga" | "Manhwa" | "Manhua";
+  genres: string[];
   rating: number;
-  chaptersCount: number;
   latestChapter: string;
   updatedAt: string;
+  chapters: Chapter[];
 }
 
-export interface HeroSlide {
+export interface User {
   id: string;
-  title: string;
-  description: string;
-  coverUrl: string;
-  accentColor: string;
+  username: string;
+  email: string;
+  avatar?: string;
 }
